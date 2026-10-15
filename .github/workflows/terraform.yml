@@ -42,19 +42,6 @@ jobs:
       - name: Terraform Validate
         run: terraform validate -no-color
 
-      - name: Inspect OIDC Claims
-        shell: bash
-        run: |
-          RESPONSE=$(curl -sS -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")
-
-          TOKEN=$(echo "$RESPONSE" | jq -r '.value')
-
-          PAYLOAD=$(echo "$TOKEN" | cut -d '.' -f 2)
-
-          echo "$PAYLOAD" | base64 -d 2>/dev/null | \
-            jq '{iss, aud, sub, repository, repository_id, repository_owner_id}'
-    
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
