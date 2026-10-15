@@ -42,6 +42,10 @@ jobs:
       - name: Terraform Validate
         run: terraform validate -no-color
 
+      - name: Debug GitHub OIDC Claims
+        uses: github/actions-oidc-debugger@main
+        with:
+          audience: sts.amazonaws.com
     
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
