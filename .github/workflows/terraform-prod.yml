@@ -1,26 +1,41 @@
+
 name: Terraform PROD CI
-    
-env: # because I don't copy tf configuration to git
-      TF_VAR_aws_region: eu-north-1
-      TF_VAR_environment: prod
-      TF_VAR_enable_lifecycle: "false"
 
 on:
   workflow_dispatch:
     inputs:
-      confirm:
-        description: 'Type PLAN to generate the production Terraform Plan'
+      operation:
+        description: 'Select Terraform operation'
         required: true
+        type: choice
+        options:
+          - plan
+          - approve
+
+      reviewed_commit:
+        description: 'Git commit SHA reviewed in the PROD Plan (required for approve)'
+        required: false
         type: string
+
+env:
+  # Terraform environment configuration
+  TF_VAR_aws_region: eu-north-1
+  TF_VAR_environment: prod
+  TF_VAR_enable_lifecycle: "false"
 
 permissions:
   contents: read
-  id-token: write # with oicd ready
+  id-token: write
 
 jobs:
-  terraform-prod-apply:
-    name: Terraform PROD Validation
-    if: ${{ inputs.confirm == 'PLAN' }}
+
+  # -----------------------------------------
+  # PROD PLAN
+  # -----------------------------------------
+
+  terraform-prod-plan:
+    name: Terraform PROD Plan
+    if: ${{ inputs.operation == 'plan' }}
     runs-on: ubuntu-latest
 
     defaults:
@@ -28,7 +43,6 @@ jobs:
         working-directory: environments/prod/central-platform
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -52,7 +66,7 @@ jobs:
 
       - name: Terraform Validate
         run: terraform validate -no-color
-   
+
       - name: Setup TFLint
         uses: terraform-linters/setup-tflint@v6
 
@@ -65,11 +79,51 @@ jobs:
       - name: Trivy IaC Security Scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          scan-type: 'config'
+          scan-type: config
           scan-ref: '.'
-          format: 'table'
+          format: table
           exit-code: '1'
-          severity: 'HIGH,CRITICAL'
+          severity: HIGH,CRITICAL
 
-      - name: Terraform Plan - Prod
+      - name: Terraform Plan - PROD
         run: terraform plan -input=false -no-color -lock-timeout=60s
+
+      - name: Display Plan Commit
+        run: echo "PROD Plan generated for commit $GITHUB_SHA"
+
+  # -----------------------------------------
+  # MANUAL APPROVAL - SIMULATION ONLY
+  # -----------------------------------------
+
+  terraform-prod-approval:
+    name: Terraform PROD Manual Approval
+    if: ${{ inputs.operation == 'approve' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate Approval Input
+        env:
+          REVIEWED_COMMIT: ${{ inputs.reviewed_commit }}
+        run: |
+          if [[ ! "$REVIEWED_COMMIT" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "ERROR: Enter a valid 40-character Git commit SHA."
+            exit 1
+          fi
+
+          if [[ "$REVIEWED_COMMIT" != "$GITHUB_SHA" ]]; then
+            echo "ERROR: Reviewed commit differs from the selected workflow commit."
+            exit 1
+          fi
+
+          echo "Reviewed commit: $REVIEWED_COMMIT"
+
+      - name: Simulate Terraform Apply
+        run: |
+          echo "========================================="
+          echo "PRODUCTION DEPLOYMENT - SIMULATION"
+          echo "========================================="
+          echo "Manual deployment confirmation received."
+          echo "Approved commit: $GITHUB_SHA"
+          echo "A real deployment would apply the reviewed Terraform plan."
+          echo "No terraform apply command was executed."
+          echo "No AWS resources were modified."
