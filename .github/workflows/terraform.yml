@@ -27,7 +27,7 @@ jobs:
         working-directory: environments/dev/central-platform
 
     steps:
-        # tf configuration
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -36,6 +36,15 @@ jobs:
 
       - name: Terraform Format Check
         run: terraform fmt -check -recursive ../../../
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::057461015409:role/enterprise-data-platform-github-actions-dev
+          aws-region: eu-north-1
+
+      - name: Verify AWS Identity
+        run: aws sts get-caller-identity
 
       - name: Terraform Init
         run: terraform init -input=false -no-color
@@ -60,16 +69,6 @@ jobs:
           format: 'table'
           exit-code: '1'
           severity: 'HIGH,CRITICAL'
-
-        # aws configuration
-      - name: Configure AWS Credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::057461015409:role/enterprise-data-platform-github-actions-dev
-          aws-region: eu-north-1
-
-      - name: Verify AWS Identity
-        run: aws sts get-caller-identity
 
       - name: Terraform Plan - DEV
         run: terraform plan -input=false -no-color -lock-timeout=60s
