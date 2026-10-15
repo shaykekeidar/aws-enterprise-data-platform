@@ -31,7 +31,6 @@ data "aws_iam_policy_document" "github_actions_trust" {
       variable = "token.actions.githubusercontent.com:aud"
       values   = ["sts.amazonaws.com"]
     }
-
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
