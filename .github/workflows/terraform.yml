@@ -1,5 +1,10 @@
 
 name: Terraform DEV CI
+    
+env: # because I don't copy tf configuration to git
+      TF_VAR_aws_region: eu-north-1
+      TF_VAR_environment: dev
+      TF_VAR_enable_lifecycle: "false"
 
 on:
   pull_request:
@@ -10,6 +15,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write # with oicd ready
 
 jobs:
   terraform-dev:
@@ -36,5 +42,16 @@ jobs:
       - name: Terraform Validate
         run: terraform validate -no-color
 
-      - name: Terraform Plan - No AWS Credentials Test
-        run: terraform plan -input=false -no-color -lock=false
+    
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::057461015409:role/enterprise-data-platform-github-actions-dev
+          aws-region: eu-north-1
+
+      - name: Verify AWS Identity
+        run: aws sts get-caller-identity
+
+
+      #- name: Terraform Plan - No AWS Credentials Test
+      #  run: terraform plan -input=false -no-color -lock=false
