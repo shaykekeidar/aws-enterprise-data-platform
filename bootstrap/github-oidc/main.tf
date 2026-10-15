@@ -62,3 +62,76 @@ output "github_actions_role_arn" {
 output "github_oidc_provider_arn" {
   value = aws_iam_openid_connect_provider.github.arn
 }
+
+
+# Allow the DEV GitHub Actions pipeline to inspect AWS resources
+# during Terraform Plan, without permission to modify infrastructure.
+
+resource "aws_iam_role_policy_attachment" "github_actions_dev_readonly" {
+  role       = aws_iam_role.github_actions_dev.name
+  policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
+}
+
+
+# GitHub Actions DEV - Terraform remote state access
+
+data "aws_iam_policy_document" "github_actions_dev_state" {
+
+  statement {
+    sid    = "ListDevState"
+    effect = "Allow"
+
+    actions = [
+      "s3:ListBucket"
+    ]
+
+    resources = [
+      "arn:aws:s3:::enterprise-data-platform-tfstate-057461015409"
+    ]
+
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+
+      values = [
+        "dev/central-platform/terraform.tfstate",
+        "dev/central-platform/terraform.tfstate.tflock"
+      ]
+    }
+  }
+
+  statement {
+    sid    = "ReadDevState"
+    effect = "Allow"
+
+    actions = [
+      "s3:GetObject"
+    ]
+
+    resources = [
+      "arn:aws:s3:::enterprise-data-platform-tfstate-057461015409/dev/central-platform/terraform.tfstate",
+      "arn:aws:s3:::enterprise-data-platform-tfstate-057461015409/dev/central-platform/terraform.tfstate.tflock"
+    ]
+  }
+
+  statement {
+    sid    = "ManageDevStateLock"
+    effect = "Allow"
+
+    actions = [
+      "s3:PutObject",
+      "s3:DeleteObject"
+    ]
+
+    resources = [
+      "arn:aws:s3:::enterprise-data-platform-tfstate-057461015409/dev/central-platform/terraform.tfstate.tflock"
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "github_actions_dev_state" {
+  name   = "enterprise-data-platform-dev-state-access"
+  role   = aws_iam_role.github_actions_dev.id
+  policy = data.aws_iam_policy_document.github_actions_dev_state.json
+}
+
