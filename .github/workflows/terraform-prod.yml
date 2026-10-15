@@ -1,5 +1,6 @@
 
 name: Terraform PROD CI
+run-name: "Terraform PROD - ${{ inputs.operation }}"
 
 on:
   workflow_dispatch:
