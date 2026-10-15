@@ -135,3 +135,93 @@ resource "aws_iam_role_policy" "github_actions_dev_state" {
   policy = data.aws_iam_policy_document.github_actions_dev_state.json
 }
 
+# prod configuration
+
+# Dedicated PROD GitHub Actions role
+
+resource "aws_iam_role" "github_actions_prod" {
+  name = "enterprise-data-platform-github-actions-prod"
+
+  assume_role_policy = data.aws_iam_policy_document.github_actions_trust.json
+
+  tags = {
+    Component   = "CICD"
+    Environment = "prod"
+  }
+}
+
+# Read-only permissions for PROD Terraform Plan
+
+resource "aws_iam_role_policy_attachment" "github_actions_prod_readonly" {
+  role       = aws_iam_role.github_actions_prod.name
+  policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
+}
+
+
+# GitHub Actions PROD - Terraform remote state access
+
+data "aws_iam_policy_document" "github_actions_prod_state" {
+
+  statement {
+    sid    = "ListProdState"
+    effect = "Allow"
+
+    actions = [
+      "s3:ListBucket"
+    ]
+
+    resources = [
+      "arn:aws:s3:::enterprise-data-platform-tfstate-057461015409"
+    ]
+
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+
+      values = [
+        "prod/central-platform/terraform.tfstate",
+        "prod/central-platform/terraform.tfstate.tflock"
+      ]
+    }
+  }
+
+  statement {
+    sid    = "ReadProdState"
+    effect = "Allow"
+
+    actions = [
+      "s3:GetObject"
+    ]
+
+    resources = [
+      "arn:aws:s3:::enterprise-data-platform-tfstate-057461015409/prod/central-platform/terraform.tfstate",
+      "arn:aws:s3:::enterprise-data-platform-tfstate-057461015409/prod/central-platform/terraform.tfstate.tflock"
+    ]
+  }
+
+  statement {
+    sid    = "ManageProdStateLock"
+    effect = "Allow"
+
+    actions = [
+      "s3:PutObject",
+      "s3:DeleteObject"
+    ]
+
+    resources = [
+      "arn:aws:s3:::enterprise-data-platform-tfstate-057461015409/prod/central-platform/terraform.tfstate.tflock"
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "github_actions_prod_state" {
+  name   = "enterprise-data-platform-prod-state-access"
+  role   = aws_iam_role.github_actions_prod.id
+  policy = data.aws_iam_policy_document.github_actions_prod_state.json
+}
+
+output "github_actions_prod_role_arn" {
+  value = aws_iam_role.github_actions_prod.arn
+}
+
+
