@@ -37,7 +37,8 @@ data "aws_iam_policy_document" "github_actions_trust" {
       variable = "token.actions.githubusercontent.com:sub"
 
       values = [
-        "repo:shaykekeidar/aws-enterprise-data-platform:ref:refs/heads/main"
+        #"repo:shaykekeidar/aws-enterprise-data-platform:ref:refs/heads/main"
+        "repo:shaykekeidar@46778647/aws-enterprise-data-platform@1420430704"
       ]
     }
   }
