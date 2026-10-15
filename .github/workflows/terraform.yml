@@ -27,6 +27,7 @@ jobs:
         working-directory: environments/dev/central-platform
 
     steps:
+        # tf configuration
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -41,7 +42,17 @@ jobs:
 
       - name: Terraform Validate
         run: terraform validate -no-color
+   
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v6
 
+      - name: Initialize TFLint
+        run: tflint --init
+
+      - name: Run TFLint
+        run: tflint --format compact
+
+        # aws configuration
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
