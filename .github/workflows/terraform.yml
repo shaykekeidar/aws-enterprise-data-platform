@@ -52,6 +52,15 @@ jobs:
       - name: Run TFLint
         run: tflint --format compact
 
+      - name: Trivy IaC Security Scan
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          format: 'table'
+          exit-code: '1'
+          severity: 'HIGH,CRITICAL'
+
         # aws configuration
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
