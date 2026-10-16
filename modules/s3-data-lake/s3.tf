@@ -66,27 +66,6 @@ data "aws_iam_policy_document" "data_lake_security" {
     }
   }
 
-  statement {
-    sid    = "DenyUploadsOutsideApprovedPrefixes"
-    effect = "Deny"
-
-    actions = ["s3:PutObject"]
-
-    not_resources = [
-      "${aws_s3_bucket.data_lake.arn}/incoming/*",
-      "${aws_s3_bucket.data_lake.arn}/curated/*",
-      "${aws_s3_bucket.data_lake.arn}/quarantine/*",
-      "${aws_s3_bucket.data_lake.arn}/archive/*",
-      "${aws_s3_bucket.data_lake.arn}/raw/*",
-      "${aws_s3_bucket.data_lake.arn}/temporary/*"
-    ]
-
-    principals {
-      type        = "*"
-      identifiers = ["*"]
-    }
-  }
-
   # Include the Office A permission only when a real role ARN is configured.
   dynamic "statement" {
     for_each = var.office_a_presign_role_arn == null ? [] : [var.office_a_presign_role_arn]

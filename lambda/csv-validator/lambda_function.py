@@ -24,6 +24,9 @@ INCOMING_PREFIX = os.environ["INCOMING_PREFIX"]
 RAW_PREFIX = os.environ["RAW_PREFIX"]
 QUARANTINE_PREFIX = os.environ["QUARANTINE_PREFIX"]
 
+# Maximum allowed CSV size: 10 MiB
+MAX_FILE_SIZE = 10 * 1024 * 1024
+
 # Schema bundled with Lambda
 SCHEMA_PATH = Path(__file__).parent / "schema.json"
 
@@ -95,39 +98,78 @@ def lambda_handler(event, context):
             if version_id:
                 copy_source["VersionId"] = version_id
 
-            # Download CSV to Lambda temporary storage
-            with tempfile.TemporaryDirectory() as temp_dir:
-                local_file = Path(temp_dir) / "uploaded.csv"
+            # Check object size BEFORE downloading the CSV.
+            # Use the same object version as the S3 event, if available.
+            head_args = {
+                "Bucket": bucket,
+                "Key": key
+            }
 
-                download_args = {
-                    "Bucket": bucket,
-                    "Key": key
-                }
+            if version_id:
+                head_args["VersionId"] = version_id
 
-                if version_id:
-                    download_args["VersionId"] = version_id
+            head = s3.head_object(**head_args)
+            object_size = head["ContentLength"]
 
-                response = s3.get_object(**download_args)
+            # Oversized files are invalid without CSV parsing.
+            if object_size > MAX_FILE_SIZE:
+                valid = False
+                errors = [
+                    f"CSV exceeds the 10 MiB limit: "
+                    f"{object_size} bytes received; "
+                    f"maximum {MAX_FILE_SIZE} bytes."
+                ]
 
-                with open(local_file, "wb") as file:
-                    for chunk in response["Body"].iter_chunks(
-                        chunk_size=1024 * 1024
-                    ):
-                        if chunk:
-                            file.write(chunk)
+            else:
+                # Download only files that passed the size check.
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    local_file = Path(temp_dir) / "uploaded.csv"
 
-                # Validate using existing validator.py
-                try:
-                    valid, errors = validate_csv(
-                        local_file,
-                        SCHEMA_PATH
-                    )
+                    download_args = {
+                        "Bucket": bucket,
+                        "Key": key
+                    }
 
-                except UnicodeError as exc:
-                    valid = False
-                    errors = [
-                        f"Invalid CSV encoding: {exc}"
-                    ]
+                    if version_id:
+                        download_args["VersionId"] = version_id
+
+                    response = s3.get_object(**download_args)
+
+                    try:
+                        with open(local_file, "wb") as file:
+                            total_downloaded = 0
+
+                            for chunk in response["Body"].iter_chunks(
+                                chunk_size=1024 * 1024
+                            ):
+                                if not chunk:
+                                    continue
+
+                                total_downloaded += len(chunk)
+
+                                # Additional protection during download.
+                                if total_downloaded > MAX_FILE_SIZE:
+                                    raise ValueError(
+                                        "CSV exceeded the 10 MiB limit "
+                                        "during download."
+                                    )
+
+                                file.write(chunk)
+                    finally:
+                        response["Body"].close()
+
+                    # Validate using existing validator.py
+                    try:
+                        valid, errors = validate_csv(
+                            local_file,
+                            SCHEMA_PATH
+                        )
+
+                    except UnicodeError as exc:
+                        valid = False
+                        errors = [
+                            f"Invalid CSV encoding: {exc}"
+                        ]
 
             # Choose destination based on validation result
             if valid:
@@ -139,14 +181,15 @@ def lambda_handler(event, context):
                 status = "INVALID"
                 result_code = 1
 
-            # Copy validated/rejected file to its destination
+            # Copy validated/rejected file to its destination.
+            # S3 CopyObject supports source objects up to 5 GB.
             s3.copy_object(
                 Bucket=bucket,
                 Key=destination_key,
                 CopySource=copy_source
             )
 
-            # Remove incoming object only after a successful copy
+            # Remove incoming object only after a successful copy.
             # For a versioned bucket, this creates a delete marker.
             s3.delete_object(
                 Bucket=bucket,
@@ -174,8 +217,8 @@ def lambda_handler(event, context):
                 request_id=request_id
             )
 
-            # Important: unexpected processing failures should
-            # cause Lambda to fail, allowing retry handling.
+            # Unexpected processing failures cause Lambda to fail,
+            # allowing retry handling.
             raise
 
     return {
