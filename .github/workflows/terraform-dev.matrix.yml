@@ -1,0 +1,138 @@
+
+# ARCHITECTURE REFERENCE ONLY
+# Multi-account DEV deployment example.
+# DISABLED: Office account infrastructure and IAM roles
+# are not implemented in the current lab.
+
+name: Terraform DEV - Multi-Account Matrix (POC)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: eu-north-1
+  TF_IN_AUTOMATION: "true"
+
+jobs:
+  terraform-dev:
+    name: DEV - ${{ matrix.office }}
+
+    # Disable all deployments and AWS authentication
+    if: ${{ false }}
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+
+      matrix:
+        include:
+          - office: central-platform
+            account_id: "111111111111"
+            terraform_dir: environments/dev/central-platform
+            environment: dev
+
+          - office: office-a
+            account_id: "222222222222"
+            terraform_dir: environments/dev/office-a
+            environment: dev
+
+          - office: office-b
+            account_id: "333333333333"
+            terraform_dir: environments/dev/office-b
+            environment: dev
+
+          - office: office-c
+            account_id: "444444444444"
+            terraform_dir: environments/dev/office-c
+            environment: dev
+
+    env:
+      TF_VAR_environment: ${{ matrix.environment }}
+      TF_VAR_aws_region: eu-north-1
+      TF_VAR_enable_lifecycle: "false"
+      TF_VAR_aws_account_id: ${{ matrix.account_id }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ matrix.account_id }}:role/terraform-dev-deployer
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: ${{ matrix.account_id }}
+          role-session-name: github-terraform-dev
+
+      - name: Verify AWS Account
+        env:
+          EXPECTED_ACCOUNT: ${{ matrix.account_id }}
+        run: |
+          ACTUAL_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+
+          if [ "$ACTUAL_ACCOUNT" != "$EXPECTED_ACCOUNT" ]; then
+            echo "ERROR: Expected account $EXPECTED_ACCOUNT but got $ACTUAL_ACCOUNT"
+            exit 1
+          fi
+
+          echo "Authenticated to expected account: $ACTUAL_ACCOUNT"
+
+      - name: Terraform Format
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init
+        working-directory: ${{ matrix.terraform_dir }}
+        run: terraform init -input=false -no-color
+
+      - name: Terraform Validate
+        working-directory: ${{ matrix.terraform_dir }}
+        run: terraform validate -no-color
+
+      - name: Terraform Plan
+        working-directory: ${{ matrix.terraform_dir }}
+        run: |
+          terraform plan \
+            -input=false \
+            -no-color \
+            -lock-timeout=60s \
+            -out=tfplan
+
+      # Requires actual deploy permissions and approval controls
+      - name: Terraform Apply
+        working-directory: ${{ matrix.terraform_dir }}
+        run: terraform apply -input=false -no-color tfplan
+
+      # Placeholder: replace with real post-deployment tests
+      - name: Post-deployment Verification
+        run: |
+          echo "Environment: ${{ matrix.environment }}"
+          echo "Office: ${{ matrix.office }}"
+          echo "AWS Account: ${{ matrix.account_id }}"
+          echo "Git Commit: $GITHUB_SHA"
+          echo "Post-deployment validation must be implemented"
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          {
+            echo "## Terraform DEV Deployment"
+            echo ""
+            echo "- Office: ${{ matrix.office }}"
+            echo "- Account: ${{ matrix.account_id }}"
+            echo "- Commit: $GITHUB_SHA"
+            echo "- Job result: ${{ job.status }}"
+            echo "- Post-deployment tests: not implemented"
+          } >> "$GITHUB_STEP_SUMMARY"

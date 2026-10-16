@@ -1,0 +1,8 @@
+{
+  "columns": {
+    "employee_id": "integer",
+    "employee_name": "string",
+    "salary": "float",
+    "hire_date": "date"
+  }
+}
