@@ -1,0 +1,45 @@
+
+name: Terraform PROD Recovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      known_good_sha:
+        description: "Previously verified PROD Git SHA"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  recovery-plan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout known-good revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.known_good_sha }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure PROD AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::057461015409:role/enterprise-data-platform-github-actions-prod
+          aws-region: eu-north-1
+
+      - name: Terraform Init
+        working-directory: environments/prod/central-platform
+        run: terraform init -input=false
+
+      - name: Recovery Plan
+        working-directory: environments/prod/central-platform
+        env:
+          TF_VAR_aws_region: eu-north-1
+          TF_VAR_environment: prod
+          TF_VAR_enable_lifecycle: "false"
+        run: terraform plan -input=false -no-color
