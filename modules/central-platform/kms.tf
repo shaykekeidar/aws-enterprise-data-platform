@@ -22,8 +22,8 @@ data "aws_iam_policy_document" "data_lake_kms" {
     ])) > 0 ? [1] : []
 
     content {
-      sid     = "AllowExternalOfficeWritesThroughS3"
-      effect  = "Allow"
+      sid    = "AllowExternalOfficeWritesThroughS3"
+      effect = "Allow"
 
       actions = [
         "kms:GenerateDataKey"

@@ -53,7 +53,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "data_lake" {
     }
   }
 
-  # TEMPORARY DATA
   rule {
     id     = "temporary-expiration"
     status = "Enabled"
@@ -62,10 +61,33 @@ resource "aws_s3_bucket_lifecycle_configuration" "data_lake" {
       prefix = "temporary/"
     }
 
+    # Expire the current object after 7 days.
     expiration {
       days = 7
     }
+
+    # Permanently delete noncurrent versions
+    # after they have been noncurrent for 7 days.
+    noncurrent_version_expiration {
+      noncurrent_days = 7
+    }
   }
+
+  # Remove obsolete delete markers when no
+  # object versions remain.
+  rule {
+    id     = "temporary-expired-delete-markers"
+    status = "Enabled"
+
+    filter {
+      prefix = "temporary/"
+    }
+
+    expiration {
+      expired_object_delete_marker = true
+    }
+  }
+
 
   # CLEAN UP INCOMPLETE UPLOADS
   rule {

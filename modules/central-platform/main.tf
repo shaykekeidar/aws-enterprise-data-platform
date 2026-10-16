@@ -14,7 +14,7 @@ module "data_lake" {
 
   enable_lifecycle     = var.enable_lifecycle
   allowed_cors_origins = []
-  
+
   office_a_presign_role_arn = var.office_a_presign_role_arn
   office_c_glue_role_arn    = var.office_c_glue_role_arn
 }
