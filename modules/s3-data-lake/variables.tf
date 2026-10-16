@@ -21,3 +21,12 @@ variable "allowed_cors_origins" {
   type        = list(string)
   default     = []
 }
+variable "office_a_presign_role_arn" {
+  type    = string
+  default = null
+}
+
+variable "office_c_glue_role_arn" {
+  type    = string
+  default = null
+}

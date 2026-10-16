@@ -1,60 +1,99 @@
-data "aws_iam_policy_document" "ecs_task_execution_assume_role" {
+
+# ============================================
+# Lambda Trust Policy
+# ============================================
+
+data "aws_iam_policy_document" "lambda_trust" {
   statement {
-    effect = "Allow"
+    actions = ["sts:AssumeRole"]
 
     principals {
-      type = "Service"
-
-      identifiers = [
-        "ecs-tasks.amazonaws.com"
-      ]
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
     }
+  }
+}
+
+# ============================================
+# Office A - CSV Validation Lambda Role
+# ============================================
+
+resource "aws_iam_role" "office_a_validator" {
+  name = "${var.name_prefix}-office-a-validator"
+
+  assume_role_policy = data.aws_iam_policy_document.lambda_trust.json
+}
+
+# ============================================
+# Office A - S3 and KMS Permissions
+# ============================================
+
+data "aws_iam_policy_document" "office_a_validator" {
+
+  statement {
+    sid = "ReadIncomingCSV"
 
     actions = [
-      "sts:AssumeRole"
+      "s3:GetObject",
+      "s3:GetObjectVersion"
+    ]
+
+    resources = [
+      "${var.data_lake_bucket_arn}/incoming/office-a/*"
+    ]
+  }
+
+  statement {
+    sid = "WriteValidatedFiles"
+
+    actions = [
+      "s3:PutObject"
+    ]
+
+    resources = [
+      "${var.data_lake_bucket_arn}/raw/office-a/*",
+      "${var.data_lake_bucket_arn}/quarantine/office-a/*"
+    ]
+  }
+
+  statement {
+    sid = "DeleteProcessedIncoming"
+
+    actions = [
+      "s3:DeleteObject"
+    ]
+
+    resources = [
+      "${var.data_lake_bucket_arn}/incoming/office-a/*"
+    ]
+  }
+
+  statement {
+    sid = "UseDataLakeKMS"
+
+    actions = [
+      "kms:Decrypt",
+      "kms:GenerateDataKey"
+    ]
+
+    resources = [
+      var.kms_key_arn
     ]
   }
 }
 
-resource "aws_iam_role" "ecs_task_execution" {
-  name = "${local.name_prefix}-ecs-task-execution-role"
-
-  assume_role_policy = data.aws_iam_policy_document.ecs_task_execution_assume_role.json
-
-  tags = {
-    Name = "${local.name_prefix}-ecs-task-execution-role"
-  }
+resource "aws_iam_role_policy" "office_a_validator" {
+  name   = "${var.name_prefix}-office-a-validator-policy"
+  role   = aws_iam_role.office_a_validator.id
+  policy = data.aws_iam_policy_document.office_a_validator.json
 }
 
-resource "aws_iam_role_policy_attachment" "ecs_task_execution" {
-  role       = aws_iam_role.ecs_task_execution.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
+# ============================================
+# CloudWatch Logs
+# ============================================
 
-data "aws_iam_policy_document" "ecs_task_assume_role" {
-  statement {
-    effect = "Allow"
+resource "aws_iam_role_policy_attachment" "office_a_logs" {
+  role = aws_iam_role.office_a_validator.name
 
-    principals {
-      type = "Service"
-
-      identifiers = [
-        "ecs-tasks.amazonaws.com"
-      ]
-    }
-
-    actions = [
-      "sts:AssumeRole"
-    ]
-  }
-}
-
-resource "aws_iam_role" "ecs_task" {
-  name = "${local.name_prefix}-ecs-task-role"
-
-  assume_role_policy = data.aws_iam_policy_document.ecs_task_assume_role.json
-
-  tags = {
-    Name = "${local.name_prefix}-ecs-task-role"
-  }
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }

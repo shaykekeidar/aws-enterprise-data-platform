@@ -7,7 +7,6 @@ resource "aws_s3_bucket" "data_lake" {
   }
 }
 
-
 data "aws_iam_policy_document" "data_lake_security" {
   statement {
     sid    = "DenyInsecureTransport"
@@ -30,6 +29,7 @@ data "aws_iam_policy_document" "data_lake_security" {
       variable = "aws:SecureTransport"
       values   = ["false"]
     }
+
     condition {
       test     = "Bool"
       variable = "aws:PrincipalIsAWSService"
@@ -58,6 +58,7 @@ data "aws_iam_policy_document" "data_lake_security" {
       variable = "s3:TlsVersion"
       values   = ["1.2"]
     }
+
     condition {
       test     = "Bool"
       variable = "aws:PrincipalIsAWSService"
@@ -69,15 +70,14 @@ data "aws_iam_policy_document" "data_lake_security" {
     sid    = "DenyUploadsOutsideApprovedPrefixes"
     effect = "Deny"
 
-    actions = [
-      "s3:PutObject"
-    ]
+    actions = ["s3:PutObject"]
 
     not_resources = [
       "${aws_s3_bucket.data_lake.arn}/incoming/*",
       "${aws_s3_bucket.data_lake.arn}/curated/*",
       "${aws_s3_bucket.data_lake.arn}/quarantine/*",
       "${aws_s3_bucket.data_lake.arn}/archive/*",
+      "${aws_s3_bucket.data_lake.arn}/raw/*",
       "${aws_s3_bucket.data_lake.arn}/temporary/*"
     ]
 
@@ -86,13 +86,52 @@ data "aws_iam_policy_document" "data_lake_security" {
       identifiers = ["*"]
     }
   }
+
+  # Include the Office A permission only when a real role ARN is configured.
+  dynamic "statement" {
+    for_each = var.office_a_presign_role_arn == null ? [] : [var.office_a_presign_role_arn]
+
+    content {
+      sid     = "AllowOfficeAPresignedUpload"
+      effect  = "Allow"
+      actions = ["s3:PutObject"]
+
+      resources = [
+        "${aws_s3_bucket.data_lake.arn}/incoming/office-a/*"
+      ]
+
+      principals {
+        type        = "AWS"
+        identifiers = [statement.value]
+      }
+    }
+  }
+
+  # Include the Office C permission only when a real role ARN is configured.
+  dynamic "statement" {
+    for_each = var.office_c_glue_role_arn == null ? [] : [var.office_c_glue_role_arn]
+
+    content {
+      sid     = "AllowOfficeCMaskedUpload"
+      effect  = "Allow"
+      actions = ["s3:PutObject"]
+
+      resources = [
+        "${aws_s3_bucket.data_lake.arn}/incoming/office-c/*"
+      ]
+
+      principals {
+        type        = "AWS"
+        identifiers = [statement.value]
+      }
+    }
+  }
 }
 
 resource "aws_s3_bucket_policy" "data_lake" {
   bucket = aws_s3_bucket.data_lake.id
   policy = data.aws_iam_policy_document.data_lake_security.json
 }
-
 
 resource "aws_s3_bucket_ownership_controls" "data_lake" {
   bucket = aws_s3_bucket.data_lake.id
@@ -121,7 +160,6 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "data_lake" {
     }
   }
 }
-
 
 resource "aws_s3_bucket_versioning" "data_lake" {
   bucket = aws_s3_bucket.data_lake.id
