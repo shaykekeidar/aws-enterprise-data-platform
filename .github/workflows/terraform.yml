@@ -1,10 +1,10 @@
 
 name: Terraform DEV CI
-    
-env: # because I don't copy tf configuration to git
-      TF_VAR_aws_region: eu-north-1
-      TF_VAR_environment: dev
-      TF_VAR_enable_lifecycle: "false"
+
+env:
+  TF_VAR_aws_region: eu-north-1
+  TF_VAR_environment: dev
+  TF_VAR_enable_lifecycle: "false"
 
 on:
   pull_request:
@@ -15,11 +15,10 @@ on:
 
 permissions:
   contents: read
-  id-token: write # with oicd ready
 
 jobs:
-  terraform-dev:
-    name: Terraform DEV Validation
+  terraform-checks:
+    name: Terraform Static Validation
     runs-on: ubuntu-latest
 
     defaults:
@@ -27,7 +26,6 @@ jobs:
         working-directory: environments/dev/central-platform
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -36,6 +34,51 @@ jobs:
 
       - name: Terraform Format Check
         run: terraform fmt -check -recursive ../../../
+
+      - name: Terraform Init Without Backend
+        run: terraform init -backend=false -input=false -no-color
+
+      - name: Terraform Validate
+        run: terraform validate -no-color
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v6
+
+      - name: Initialize TFLint
+        run: tflint --init
+
+      - name: Run TFLint
+        run: tflint --format compact
+
+      - name: Trivy IaC Security Scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          format: table
+          exit-code: '1'
+          severity: HIGH,CRITICAL
+
+  terraform-plan:
+    name: Terraform DEV Plan
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: terraform-checks
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    defaults:
+      run:
+        working-directory: environments/dev/central-platform
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
 
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -49,27 +92,5 @@ jobs:
       - name: Terraform Init
         run: terraform init -input=false -no-color
 
-      - name: Terraform Validate
-        run: terraform validate -no-color
-   
-      - name: Setup TFLint
-        uses: terraform-linters/setup-tflint@v6
-
-      - name: Initialize TFLint
-        run: tflint --init
-
-      - name: Run TFLint
-        run: tflint --format compact
-
-      - name: Trivy IaC Security Scan
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          scan-type: 'config'
-          scan-ref: '.'
-          format: 'table'
-          exit-code: '1'
-          severity: 'HIGH,CRITICAL'
-
       - name: Terraform Plan - DEV
         run: terraform plan -input=false -no-color -lock-timeout=60s
-
