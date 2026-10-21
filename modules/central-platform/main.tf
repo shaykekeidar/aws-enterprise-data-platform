@@ -14,9 +14,14 @@ module "data_lake" {
 
   enable_lifecycle     = var.enable_lifecycle
   allowed_cors_origins = [] # disable cors for poc
-  #allowed_cors_origins = ["http://localhost:3000"] # enable cors for poc
-  #allowed_cors_origins = ["https://d1234567890abc.cloudfront.net"] #enable cors for poc with cloudfront only
-  #allowed_cors_origins = [""https://upload.uniqueId.com"] # best practice: cloud front with route53
+  #allowed_cors_origins = ["http://localhost:3000"] 
+  # Enable cors for poc
+  
+  #allowed_cors_origins = ["https://d1234567890abc.cloudfront.net"] 
+  # Enable cors for poc with cloudfront only
+  
+  #allowed_cors_origins = ["https://upload.my-owned-domain.com"] 
+  # best practice: cloud front with route53
  
   office_a_presign_role_arn = var.office_a_presign_role_arn
   office_c_glue_role_arn    = var.office_c_glue_role_arn
