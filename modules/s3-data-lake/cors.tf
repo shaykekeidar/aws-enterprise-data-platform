@@ -1,4 +1,3 @@
-
 resource "aws_s3_bucket_cors_configuration" "data_lake" {
   count = length(var.allowed_cors_origins) > 0 ? 1 : 0
 
