@@ -2,6 +2,47 @@ AWS Enterprise Data Platform
 Terraform infrastructure proof of concept (POC) | Multi-account AWS data-platform architecture
 This repository accompanies an architecture and implementation assignment for a shared AWS data platform serving three offices (Office A, Office B, and Office C). It demonstrates infrastructure-as-code patterns for a centrally governed data lake, AWS account separation, identity and encryption controls, and deployment workflows.
 > **Scope and evidence:** This repository is primarily an **AWS infrastructure / platform-engineering POC**, not a verified end-to-end production data platform. A portion of the Central Platform **DEV** infrastructure was deployed and inspected. Other workflows are represented by code, Terraform configurations, proposed architecture, or test plans. The status matrix below distinguishes these cases. **PROD was not deployed.**
+
+## Project Highlights
+
+An AWS enterprise data platform architecture and Terraform
+proof of concept designed for three independent offices
+sharing a centrally governed data lake.
+
+### Key Engineering Areas
+
+- Multi-account AWS architecture and governance
+- Terraform infrastructure as code and reusable modules
+- Centralized S3 data lake with KMS encryption
+- IAM and cross-account access control
+- Serverless data ingestion architecture
+- Infrastructure automation with GitHub Actions and OIDC
+- Terraform remote state management
+- Security, cost modeling, and operational planning
+
+### Implementation Scope
+
+**Implemented / partially validated:**
+- Central Platform DEV Terraform infrastructure
+- S3 remote Terraform state
+- Data lake infrastructure configuration
+- Office C IAM Terraform configuration
+- Office A CSV validation Lambda source code
+
+**Architecture / planned integrations:**
+- Office A end-to-end authenticated uploads
+- Office B scheduled API ingestion
+- Office C RDS snapshot export and PII masking
+- AWS Glue transformations and curated datasets
+- Athena and QuickSight analytics
+- Production account infrastructure
+
+This is an infrastructure engineering POC and
+architecture demonstration, not a production deployment.
+
+See the detailed implementation status matrix below
+for verification evidence and limitations.
+
 1. Architecture
 Account and governance model
 The target design uses AWS Organizations with separate organizational units (OUs) and accounts. This is the proposed enterprise structure, not a claim that every account was provisioned during the POC.
